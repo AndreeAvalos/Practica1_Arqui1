@@ -56,13 +56,26 @@ msjNum db 0Ah,0dh,"Ingrese Numero: $"
 msjFac db 0Ah,0dh,"Ingrese Factorial: $"
 msjop db 0Ah,0dh,"Ingrese Operador + - * / : ","$"
 msj2 db 0Ah,0dh, "USTED ACABA DE SALIR..... :D","$"
-msj3 db 0Ah,0dh,"****Bienvenido a Modo de Carga 	****","$"
-msj4 db 0Ah,0dh,"****Bienvenido a Modo Calculadora	****","$"
-msj5 db 0Ah,0dh,"****Bienvenido a Modo Factorial 	****","$"
-msj6 db 0Ah,0dh,"****Bienvenido a Modo Reporte 		****","$"
-msj7 db 0Ah,0dh,"Desea ingresar otra operacion? Si=1/ No=0","$"
+msj3 db 0Ah,0dh,"****	Bienvenido a Modo de Carga 		****","$"
+msj4 db 0Ah,0dh,"****	Bienvenido a Modo Calculadora	****","$"
+msj5 db 0Ah,0dh,"****	Bienvenido a Modo Factorial 	****","$"
+msj6 db 0Ah,0dh,"****	Bienvenido a Modo Reporte 		****","$"
+msj7 db 0Ah,0dh,"Desea ingresar otra operacion? Si=1/No=0","$"
+msj9 db 0Ah,0dh,"Desea ingresar otro factorial? Si=1/No=0","$"
+msj8 db 0Ah,0dh,"Desea ingresar otra ruta? Si=1/No=0","$"
+msj_10 db 0Ah,0dh,"Caracter no valido: ","$"
+msj11 db 0Ah,0dh,"Operacion: ","$"
 msjResultado db 0Ah,0Dh, "Resultado = ", "$"
 msj_error db 0ah,0dh,"Valor Fuera de Rango","$"
+msj_Ruta db 0Ah,0Dh, "Ingrese ruta de archivo: ","$"
+noAbre db 0ah,0dh,'No se pudo abrir el archivo.','$'
+noLee db 0ah,0dh,'No se puede leer el archivo.','$'
+noCierra db	0ah,0dh,'No se puede cerrar el archivo.','$'
+msgNoExisteA db 0ah,0dh, 'El archivo no existe','$' 
+msgErrorA db 0ah,0dh, 'Error al leer el archivo','$' 
+msgCargaA db  0ah,0dh, 'El archivo se ha cargado', '$'
+msgNoFormato db 'El archivo no tiene el formato','$'  
+msgReporte db 'El reporte se ha creado.','$' 
 nuevaLinea	db	0Ah,0Dh, '$'
 fac0 db  0Dh,0Ah ,'0!=1','$'
 fac1 db  0Dh,0Ah ,'1!=1','$'
@@ -72,7 +85,7 @@ fac4 db  0Dh,0Ah ,'4!=1*2*3*4=24','$'
 fac5 db  0Dh,0Ah ,'5!=1*2*3*4*5=120','$'
 fac6 db  0Dh,0Ah ,'6!=1*2*3*4*5*6=720','$'
 fac7 db  0Dh,0Ah ,'7!=1*2*3*4*5*6*7=5040','$'
-err1 db  0Dh,0Ah ,"!!!!!!!!!!!!!!Operador Equivocado!!!!!!!!!!!!",  0Dh,0Ah ,'$'
+err1 db  0Dh,0Ah ,"¡¡¡¡¡¡¡¡¡¡¡¡¡¡Operador Equivocado!!!!!!!!!!!!",  0Dh,0Ah ,'$'
 aprox db " Aproximado al entero mas cercano $"
 ;----------------------------------------------------------------------------------------------------------------
 factorial db 0
@@ -81,10 +94,19 @@ diez dw 10
 ;-----------------Variables para almacenar valores y operador-----------------
 numero1 dw ?
 numero2 dw ?
+unidades db 0
+decenas db 0
+numeroAux db 0
+
 ans dw ?
 op db '?'
-;------------------------------------------------------------------------------
-
+;----------------Variables para cargar archivo ------------------
+handle dw ? 
+buffArch	db	?
+ruta db 60 dup(0) ;Variable que se utiliza para la ruta del archivo  
+contenido db 75 dup(0) ;variable para obtener el contenido del archivo
+inChar db '?' 
+;-----------------------------------------------------------------
 ;///////////////////////////////////////////////////
 ;definimos el area de codigo
 .code
@@ -116,7 +138,209 @@ op db '?'
 		jmp Bucle_Menu;si no es ninguno de los anteriores entonces vuelve a llamarse a si mismo
 		
 		@cargar:
-			imprimir msj3
+			imprimir msj3;imprimimos el mensaje de bienvenida
+			imprimir msj_Ruta; mensaje de ruta
+			mov si,00;limpiamos contador
+			@Inicio:;leemos que sea &
+				call obtener_char;obtenemos el caracter entrante
+				cmp inChar,'&';lo comparamos 
+				je @@Inicio;si es igual entonces pasa
+				call remover_caracter;de lo contrario lo removemos de la salida en consola
+				
+				jmp @Inicio
+		
+				@@Inicio:
+					call obtener_char;obtenemos el valor del teclado
+					cmp inChar,'&'; lo comparamos
+					je @LeerPath; si es igual ya tenemos el && por lo tanto adentro viene la path
+					
+					call remover_caracter; de lo contrario removemos el caracter entrante y pedimos de nuevo 
+					
+					jmp @@Inicio
+		
+			@LeerPath:
+				call obtener_char;onntenemos el caracter entrante 
+				mov ruta[si],al;lo guardamos en el vector de ruta
+				inc si; incrementamos el contador
+				cmp inChar,'&';comparamos si viene el signo
+				je @Fin; si viene entonces es el inicio para el fin de ruta
+				jnz @LeerPath; de lo contrario seguimos pidiendo caracteres
+
+			@Fin:
+				call obtener_char; obtenemos caracter
+				cmp inChar,'&'; comparamos el &
+				je @@Fin;si es asi entonces termina de introducir caracteres 
+				call remover_caracter; de lo contrario removemos el caracter
+				jmp @Fin
+		
+				@@Fin:
+					call obtener_char; obtenemos el caracter 
+					
+					cmp inChar,0Dh; si es un intro 
+					mov ruta[si-1],"$";agregamos al final $ para que sea imprimible
+					je @abrir_archivo;saltamos a abrir archivo
+					
+					call remover_caracter; removemos caracter de lo contrario
+					jmp @@Fin;volvemos a pedir hasta que sea intro
+					
+			@abrir_archivo:
+				clc; limpiar bandera de acarreo
+				mov ah,3Dh; funcion para abrir un fichero
+				mov al, 0000h;limpiamos registro bajo
+				mov dx, offset ruta; pasamos el contenido de ruta a dx
+				int 21h;funcion DOS
+				print ruta;
+				jc @error_abrir; si existe acarreo entonces no se puede abrir el archivo		
+				
+				
+				
+				
+			@leer:
+				mov handle,ax;movemos hacia el puntero
+				mov ah,3Fh;lectura de fichero
+				mov bx, handle; movemos apuntador hacia bx
+				mov cx,75; cantidad de bytes a leer
+				lea dx, contenido; donde se almacenaran los bytes leidos
+				int 21h;interrupcion DOS
+				jc @error_leer;si existe acarreo existe error 
+				mov ah,3Eh;cerrar fichero
+				mov bx, handle
+				int 21h;funcion DOS
+				
+				mov si,0
+				
+			@leer_Contenido:
+			
+				cmp contenido[si],' ';comparamos con espacio para seguir en el archivo
+				je @seguir;
+				
+				cmp contenido[si],'*';comparamos con multiplicacion
+				je @Multiplicacion
+				
+				cmp contenido[si],'+';compramos con suma
+				je @Suma
+				
+				cmp contenido[si],'-';comparamos con resta
+				je @Resta
+				
+				cmp contenido[si],'/';comparacion con division
+				je @Division
+				
+				cmp contenido[si],';';compramos con punto y como 
+				je @fin_archivo; vamos a finalizar de leer
+				
+				cmp contenido[si],'0'; compramos si es nuemero
+				jae @esnumero;si es mayor o igual a 0
+				
+			@esnumero:
+				cmp contenido[si],'9';compramos con 9
+				jbe @validacion;es valido si es menor o igual a 9
+				jne @informarError;de lo contrario es caracter no valido y se informar
+				
+			@validacion:
+				
+				mov bx,0;limpiamos los registros bx, ax
+				mov ax,0
+				
+				mov al,contenido[si];copiamos el primer digito
+				sub al,'0';extraemos para convertir a decimal
+				cbw ;convertimos de byte a palabra
+				mov numero1,ax;movemos el registro al auxiliar numero
+				inc si;incrementamos el contador
+				
+				mov al,contenido[si];copiamos el segundo digito
+				inc si;incrementamos el contador
+				sub al,'0';restamos 30h para convertirlo en decimal
+				cbw; convertimos de byte a palabra(word)
+				mov numero2,ax;pasamos al registro auxiliar
+				
+				mov ax,numero1;movemos a dx el primer digito
+				mul diez;lo multiplicamos Ax=ax*10
+				mov bx,numero2;movemos al registro el segundo digito
+				add ax,bx; agreamos las unidades a las decenas para formar el numero
+				
+				push ax;agregamos a la pila ax
+
+				;call Imprimir_Numero
+				
+				
+				jmp @leer_Contenido
+				
+			@Multiplicacion:
+				pop ax;sacamos el primer valor y se almacena en ax
+				pop bx;sacamos el segundo valor y se almacena en bx
+				
+				imul bx; ax=ax*bx
+				push ax; ingresamos nuevamente el valor resultante en la pila
+				jmp @seguir
+				
+			@Suma:
+				pop ax;sacamos el primer valor y se almacena en ax
+				pop bx;sacamos el segundo valor y se almacena en bx
+				
+				add ax,bx; 
+				push ax; ingresamos nuevamente el valor resultante en la pila
+				jmp @seguir
+				
+			@Resta:
+				pop ax;sacamos el primer valor y se almacena en ax
+				pop bx;sacamos el segundo valor y se almacena en bx
+				
+				sub ax,bx; 
+				push ax; ingresamos nuevamente el valor resultante en la pila
+				jmp @seguir
+				
+			@Division:
+				pop ax;sacamos el primer valor y se almacena en ax
+				pop bx;sacamos el segundo valor y se almacena en bx
+				
+				idiv bx; ax=ax/bx
+				push ax; ingresamos nuevamente el valor resultante en la pila
+				jmp @seguir
+				
+			@seguir:
+				inc si
+				jmp @leer_Contenido
+				
+			@error_abrir:
+				imprimir msgNoExisteA  ; mostramos mensaje de que no existe el archivo
+				jmp @Retorno ;vuelve a pedir el path 
+				
+			@error_leer:
+				imprimir msgErrorA ;mensaje de que ahi un error al leer el archivo
+				jmp @Retorno ;vuelve a pedir el path 
+			
+			@informarError:
+				imprimir msj_10
+				imprimirCaracter contenido[si]
+				jmp @seguir
+				
+			@fin_archivo:
+				mov contenido[si+1],"$"
+				imprimir msgCargaA
+				imprimir msj11
+				imprimir contenido
+				imprimir msjResultado
+				pop ax
+				call Imprimir_Numero
+				jmp @Retorno
+				
+			@Retorno:
+			;aqui debe ir para hacer operacion
+				imprimir msj8
+				imprimir msj1
+			
+				mov ah,01h;leer caracter desde teclado
+				int 21h; 
+				sub al,30h;restamos 48 en hexadecimal para obtener un numero 
+				mov opcion,al;movemos el valor resultante la opcion
+				
+				cmp opcion,1
+				je @cargar
+			
+				cmp opcion,0
+				je Bucle_Menu
+				
 			jmp Bucle_Menu;retornamos a menu
 		@calculadora:
 			imprimir msj4;imprimimos mensaje de bienvenida
@@ -285,7 +509,7 @@ op db '?'
 						jmp @@retorno;retornamos
 			
 			@@retorno:
-				imprimir msj7
+				imprimir msj9
 				imprimir msj1
 
 				mov ah,01h;leer caracter desde teclado
@@ -317,6 +541,15 @@ op db '?'
 		
 	Bucle_Menu endp
 ;----------------------------Area para procesos--------------------------
+;============================Proceso para leer archivo=====================
+remover_caracter proc near
+	imprimirCaracter 08h;eliminamos la posicion anterior 
+	imprimirCaracter ' ';limpiamos la posicion actual
+	imprimirCaracter 08h 
+	ret	
+remover_caracter endp
+;==========================================================================
+
 ;=================Procesos de operaciones==================================
 Suma proc near
 	mov ax, numero1;movemos el numero hacia el registro ax
@@ -458,7 +691,7 @@ obtener_numero proc near
 	@remover_caracter:
 		imprimirCaracter 08h;eliminamos la posicion anterior 
 		imprimirCaracter ' ';limpiamos la posicion actual
-		imprimirCaracter 09h
+		imprimirCaracter 08h
 		jmp @siguiente_digito;regresamos a introducir un digito
 		
 	@esnumero:
@@ -628,6 +861,26 @@ obtener_operador proc near
 	ret
 obtener_operador endp
 ;====================================================================
+;=====================Proceso para obtener el caracter==============
+obtener_char proc near
+	mov ah,01h;leer caracter desde teclado
+	int 21h
+	mov inChar,al
+	cmp inChar,08h
+	jne @todoOk
+	je @removercaracter;
+	
+	@removercaracter:
+		imprimirCaracter ' '
+		imprimirCaracter 08h
+		mov ruta[si],0
+		ret
+	@todoOk:
+		ret
+	
+obtener_char endp
+;====================================================================
+
 ;============Proceso para mostrar error==============================
 mostrar_error proc near
 	imprimir msj_error	
